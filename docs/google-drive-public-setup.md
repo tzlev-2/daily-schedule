@@ -14,7 +14,85 @@
 - ✅ זיהוי קונפליקטים (lastModified)
 - ✅ Hydration/Dehydration של תמונות מ-IndexedDB
 
-**מה חסר?** רק שינוי סטטוס הפרסום ב-Google Cloud Console מ-"Testing" ל-"In production".
+**מה חסר?** שינוי סטטוס הפרסום ב-Google Cloud Console מ-"Testing" ל-"In production".
+
+## 🔴 תיקון 2026-11-02 — זו אינה לחיצה אחת
+
+המדריך למטה נכתב כאילו די ללחוץ **PUBLISH APP** ולאשר. **זה אינו מדויק.**
+נמדד בקונסולה: הכפתור **חסום** עד שממלאים שני שדות, והסיבה אינה מופיעה
+בטקסט הגלוי.
+
+### מה גוגל דורשת כדי לעבור ל-production
+
+| שדה (בדף Branding) | נדרש? |
+|---|---|
+| App name | ✅ |
+| User support email | ✅ |
+| **Application home page** | ✅ **זה מה שחסם** |
+| **Application privacy policy link** | ✅ **זה מה שחסם** |
+| Application Terms of Service link | ❌ אינו נדרש לפרסום |
+| Authorised domains | ✅ הדומיין של שתי הכתובות חייב להיות רשום כאן |
+
+‏🛑 **דף Branding אינו מסמן שום שדה כחסר.** השדות הריקים נראים רגילים,
+בלי סימון שגיאה. ‏⇒ קל להסיק שהכול מוכן ושהבעיה היא בכפתור.
+
+### 🔑 איך למצוא את הסיבה המדויקת
+
+הכפתור נראה לחיץ אבל נושא `aria-disabled="true"` (תבנית Material של כפתור
+מושבת שמקבל קליק רק כדי להציג טולטיפ). **ההסבר יושב ב-`aria-describedby`:**
+
+```js
+const b = [...document.querySelectorAll('button')]
+  .find(x => /publish app/i.test(x.innerText));
+document.getElementById(b.getAttribute('aria-describedby')).innerText
+```
+
+מחזיר:
+
+> Valid app name, support email, homepage URL and privacy policy URL are
+> required for switching the app to external production mode. You must enter
+> the missing information to proceed. Please visit the Branding page to finish
+> configuring your app.
+
+### ⚠️ הקונסולה זזה — הנתיב בשלב 2 מיושן
+
+‏`APIs & Services → OAuth consent screen` הוחלף ב-**Google Auth Platform**,
+עם לשוניות נפרדות: **Audience** (סטטוס הפרסום, ‏user cap, ‏test users) ו-
+**Branding** (שם, מיילים, הכתובות, Authorised domains).
+
+### 🔴 ולמה בכל זאת שווה לפרסם — מגבלת 7 הימים
+
+מתועד אצל גוגל ב-`developers.google.com/identity/protocols/oauth2`:
+
+> A Google Cloud Platform project with an OAuth consent screen configured for
+> an external user type and a publishing status of **Testing** is issued a
+> refresh token expiring in **7 days**, unless the only OAuth scopes requested
+> are a subset of name, email address, and user profile.
+
+‏⇒ כל עוד האפליקציה ב-Testing וסקופ Drive מבוקש, **ה-refresh token פג כל
+7 ימים** וצריך לאשר מחדש. זו התנהגות מתוכננת של גוגל, לא תקלה — וזו הסיבה
+המרכזית לעבור ל-production.
+
+‏🛑 **אבל "לא פג מעצמו" אינו "נצחי".** אותו עמוד מונה עוד סיבות, ושתיים
+רלוונטיות לאפליקציה כזאת: **שינוי סיסמת גוגל** (חל כשמבקשים סקופים של
+Gmail), ו-**מעל 100 refresh tokens לחשבון לכל client** — *"creating a new
+refresh token automatically invalidates the oldest without warning"*.
+
+### 🔴 ועוד דבר שהמקטע "האם צריך Verification" לא אומר
+
+אפליקציה לא-מאומתת **עובדת** — כולל סקופים sensitive ו-restricted. מה שכן
+מתלווה: מסך האזהרה, ותקרת **100 משתמשים חדשים לכל חיי הפרויקט**, ש‏**אינה
+ניתנת לאיפוס או שינוי** (לשון הקונסולה: *"cannot be reset or changed"*).
+
+‏⚠️ **ובמסך ההסכמה עצמו גוגל מוסיפה אזהרה שאינה בתיעוד הפומבי:**
+*"אחרת, יכול להיות שיתבטלו חלק מהרשאות הגישה של האפליקציה לנתונים שלך"*.
+‏⇒ "עובד בלי verification" נכון להיום ואינו הבטחה לעתיד. אם האפליקציה
+מתחילה לקבל `403` על **שירות בודד** ולא על כולם — זה החשד הראשון, ולא
+טוקן פג.
+
+‏✅ **והפעולה הפיכה** — בדף Audience יש `Back to testing`.
+
+---
 
 ---
 
@@ -38,6 +116,9 @@
    - **User type: External**
 
 ### שלב 3: שינוי סטטוס הפרסום
+
+‏🛑 **לפני הלחיצה — לוודא שדף Branding מלא** (ראו התיקון מ-2026-11-02 למעלה).
+בלי `Application home page` ו-`Application privacy policy link` הכפתור חסום.
 
 1. לחץ על כפתור **"PUBLISH APP"** (או "Publish to Production")
 2. תופיע אזהרה:
